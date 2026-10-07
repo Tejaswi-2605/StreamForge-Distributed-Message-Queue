@@ -6,7 +6,7 @@ A Go event-streaming broker built to study durable logs, partition routing, cons
 
 ## What is implemented
 
-- Persistent partition logs with record offsets, CRC checksums, segment rotation, sparse in-memory indexes, restart scanning and opt-in automatic segment retention with durable retry pins.
+- Persistent partition logs with record offsets, CRC checksums, segment rotation, sparse in-memory indexes,  restart scanning and opt-in automatic segment retention with durable retry pins.
 - Three-broker operation with fixed partition ownership; keyed hashing, round-robin routing and explicit partition selection.
 - Unary gRPC APIs for topics, publication, batches, reads, committed offsets, groups and failure scheduling.
 - PostgreSQL metadata, monotonic next-offset commits, group generations and durable retry jobs.
