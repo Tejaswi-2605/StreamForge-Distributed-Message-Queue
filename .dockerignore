@@ -1,0 +1,11 @@
+.git
+.tools
+bin
+artifacts
+data/raw
+data/local
+data/brokers
+.env
+.env.*
+!.env.example
+LEARNING_GUIDE.md

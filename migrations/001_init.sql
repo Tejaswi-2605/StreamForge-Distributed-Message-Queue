@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS schema_migrations(version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS brokers(id integer PRIMARY KEY CHECK(id>=0), address text NOT NULL UNIQUE);
+CREATE TABLE IF NOT EXISTS topics(name varchar(128) PRIMARY KEY, created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS partitions(topic varchar(128) REFERENCES topics(name), id integer CHECK(id>=0), owner_id integer NOT NULL REFERENCES brokers(id), PRIMARY KEY(topic,id));
+CREATE INDEX IF NOT EXISTS partitions_owner_idx ON partitions(owner_id);
+CREATE TABLE IF NOT EXISTS consumer_groups(name varchar(128), topic varchar(128) REFERENCES topics(name), generation bigint NOT NULL DEFAULT 0, PRIMARY KEY(name,topic));
+CREATE TABLE IF NOT EXISTS consumer_members(group_name varchar(128), topic varchar(128), member varchar(128), PRIMARY KEY(group_name,topic,member), FOREIGN KEY(group_name,topic) REFERENCES consumer_groups(name,topic));
+CREATE TABLE IF NOT EXISTS consumer_offsets(group_name varchar(128), topic varchar(128), partition integer, next_offset bigint NOT NULL CHECK(next_offset>=0), PRIMARY KEY(group_name,topic,partition), FOREIGN KEY(group_name,topic) REFERENCES consumer_groups(name,topic), FOREIGN KEY(topic,partition) REFERENCES partitions(topic,id));
+CREATE TABLE IF NOT EXISTS retry_jobs(id text PRIMARY KEY, source_topic varchar(128), source_partition integer, source_offset bigint CHECK(source_offset>=0), attempt integer NOT NULL CHECK(attempt>=1), target_topic varchar(128) NOT NULL REFERENCES topics(name), due_at timestamptz NOT NULL, last_error varchar(512) NOT NULL, completed boolean NOT NULL DEFAULT false, UNIQUE(source_topic,source_partition,source_offset), FOREIGN KEY(source_topic,source_partition) REFERENCES partitions(topic,id));
+CREATE INDEX IF NOT EXISTS retry_due_idx ON retry_jobs(due_at) WHERE NOT completed;
+INSERT INTO schema_migrations(version) VALUES(1) ON CONFLICT DO NOTHING;

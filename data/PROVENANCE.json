@@ -1,0 +1,60 @@
+{
+  "dataset": "GH Archive public GitHub events",
+  "homepage": "https://www.gharchive.org/",
+  "source_url": "https://data.gharchive.org/2015-01-01-15.json.gz",
+  "local_path": "data/raw/2015-01-01-15.json.gz",
+  "format": "gzip-compressed newline-delimited JSON",
+  "acquired_date": "2026-10-02",
+  "verified_and_replayed_date": "2026-10-05",
+  "audit_timezone": "Asia/Calcutta",
+  "source_hour_utc": "2015-01-01T15:00:00Z",
+  "first_event_timestamp": "2015-01-01T15:00:00Z",
+  "last_event_timestamp": "2015-01-01T15:59:59Z",
+  "compressed_bytes": 3844072,
+  "sha256": "dc50a9e7cf6fd56cfbb7fa11381a6bcf3657a1e279131b66888ebbfb58652e76",
+  "selection": "complete single-hour archive; no synthetic substitutions",
+  "valid_json_event_lines": 11351,
+  "published_fields": [
+    "id",
+    "type",
+    "created_at",
+    "repo.name"
+  ],
+  "partition_key": "repo.name",
+  "privacy_notes": "Actors/full event payloads omitted; repository names may identify users. Minimization is not anonymization.",
+  "license_notes": "Public archive access does not establish a uniform license for underlying event content; no blanket license asserted.",
+  "verified_replay": {
+    "partitions": 3,
+    "parsed": 11351,
+    "published": 11351,
+    "rejected": 0,
+    "consumed": 11351,
+    "published_bytes": 1314477,
+    "ingestion_seconds": 32.9850065,
+    "consumption_seconds": 0.2580662,
+    "verification": "published partition/offset identities and total readback count; not full payload digest equality or consumer-group processing"
+  },
+  "raw_data_tracked": false,
+  "evidence": "artifacts/audit-replay.json (ignored local file)",
+  "completion_group_replay": {
+    "verified_date": "2026-10-06",
+    "partitions": 3,
+    "brokers": 3,
+    "durability": "fsync",
+    "ingestion": {
+      "parsed": 11351,
+      "published": 11351,
+      "rejected": 0,
+      "bytes": 1314477,
+      "elapsed_seconds": 28.6986988,
+      "records_per_second": 395.52315870153666
+    },
+    "consumed": 11351,
+    "consume_seconds": 0.8682191,
+    "consume_records_per_second": 13073.888837506569,
+    "consumer_group": "replay.1791225912309883700",
+    "verification": "SHA-256 payload/key/offset equality per partition and committed group resume",
+    "committed_lag": 0,
+    "evidence": "artifacts/benchmarks/20261005T183737-9542248f/replay.json (ignored local file)"
+  }
+}

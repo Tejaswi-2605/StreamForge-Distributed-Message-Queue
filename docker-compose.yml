@@ -1,0 +1,94 @@
+x-broker: &broker
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+  image: streamforge:local
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  environment: &broker-env
+    POSTGRES_DSN: postgres://streamforge:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/streamforge?sslmode=disable
+    REDIS_ADDR: redis:6379
+    BROKER_LIST: broker-1:9001,broker-2:9001,broker-3:9001
+    BROKER_ADDRESS: 0.0.0.0:9001
+    METRICS_ADDRESS: 0.0.0.0:9101
+    DATA_DIR: /data
+    FSYNC_MODE: fsync
+    RETENTION_MAX_SEGMENTS: ${RETENTION_MAX_SEGMENTS:-0}
+    RETENTION_INTERVAL: ${RETENTION_INTERVAL:-1m}
+  healthcheck:
+    test: [CMD, curl, -fsS, http://localhost:9101/healthz]
+    interval: 5s
+    timeout: 3s
+    retries: 20
+    start_period: 10s
+  stop_grace_period: 15s
+services:
+  postgres:
+    image: postgres:17.6-bookworm
+    environment:
+      POSTGRES_USER: streamforge
+      POSTGRES_DB: streamforge
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports: ["127.0.0.1:${POSTGRES_PORT:-55432}:5432"]
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U streamforge -d streamforge]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:8.2.1-bookworm
+    command: [redis-server, --save, "", --appendonly, "no"]
+    ports: ["127.0.0.1:${REDIS_PORT:-56379}:6379"]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  broker-1:
+    <<: *broker
+    environment:
+      <<: *broker-env
+      BROKER_ID: "0"
+    ports: ["127.0.0.1:${BROKER_1_PORT:-9001}:9001", "127.0.0.1:${METRICS_1_PORT:-9101}:9101"]
+    volumes: [broker-1-data:/data]
+  broker-2:
+    <<: *broker
+    environment:
+      <<: *broker-env
+      BROKER_ID: "1"
+    ports: ["127.0.0.1:${BROKER_2_PORT:-9002}:9001", "127.0.0.1:${METRICS_2_PORT:-9102}:9101"]
+    volumes: [broker-2-data:/data]
+  broker-3:
+    <<: *broker
+    environment:
+      <<: *broker-env
+      BROKER_ID: "2"
+    ports: ["127.0.0.1:${BROKER_3_PORT:-9003}:9001", "127.0.0.1:${METRICS_3_PORT:-9103}:9101"]
+    volumes: [broker-3-data:/data]
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command: [--config.file=/etc/prometheus/prometheus.yml]
+    ports: ["127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"]
+    volumes: [./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro]
+  tools:
+    <<: *broker
+    profiles: [tools]
+    entrypoint: [demo]
+    command: [--broker, broker-1:9001]
+    depends_on:
+      broker-1: {condition: service_healthy}
+      broker-2: {condition: service_healthy}
+      broker-3: {condition: service_healthy}
+    healthcheck: {disable: true}
+    restart: "no"
+    volumes: [./data/raw:/replay:ro]
+volumes:
+  postgres-data:
+  broker-1-data:
+  broker-2-data:
+  broker-3-data:

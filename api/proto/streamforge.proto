@@ -1,0 +1,38 @@
+syntax = "proto3";
+package streamforge.v1;
+option go_package = "streamforge/api/gen;pb";
+
+service StreamForge {
+ rpc CreateTopic(CreateTopicRequest) returns (Topic);
+ rpc ListTopics(Empty) returns (Topics);
+ rpc DescribeTopic(TopicRequest) returns (Topic);
+ rpc Publish(PublishRequest) returns (Message);
+ rpc PublishBatch(PublishBatchRequest) returns (Messages);
+ rpc Fetch(FetchRequest) returns (FetchResponse);
+ rpc CommitOffset(CommitRequest) returns (Empty);
+ rpc GetCommittedOffset(OffsetRequest) returns (OffsetResponse);
+ rpc JoinConsumerGroup(MemberRequest) returns (Assignment);
+ rpc Heartbeat(MemberRequest) returns (Assignment);
+ rpc LeaveConsumerGroup(MemberRequest) returns (Empty);
+ rpc FailMessage(FailRequest) returns (RetryResponse);
+}
+message Empty {}
+message TopicRequest { string topic = 1; }
+message CreateTopicRequest { string name = 1; int32 partitions = 2; }
+message Partition { int32 id = 1; int32 owner_id = 2; string owner_address = 3; }
+message Topic { string name = 1; repeated Partition partitions = 2; }
+message Topics { repeated Topic topics = 1; }
+message PublishRequest { string topic = 1; bytes key = 2; bytes payload = 3; optional int32 partition = 4; map<string,string> headers = 5; }
+message Message { string id = 1; string topic = 2; int32 partition = 3; int64 offset = 4; int64 timestamp_unix_nano = 5; bytes key = 6; bytes payload = 7; map<string,string> headers = 8; }
+message PublishBatchRequest { repeated PublishRequest messages = 1; }
+message Messages { repeated Message messages = 1; }
+enum StartPosition { EXPLICIT = 0; EARLIEST = 1; LATEST = 2; COMMITTED = 3; }
+message FetchRequest { string topic = 1; int32 partition = 2; int64 offset = 3; int32 limit = 4; StartPosition start = 5; string group = 6; string member = 7; int64 generation = 8; }
+message FetchResponse { repeated Message messages = 1; int64 earliest_offset = 2; int64 next_offset = 3; }
+message OffsetRequest { string group = 1; string topic = 2; int32 partition = 3; }
+message OffsetResponse { int64 next_offset = 1; bool exists = 2; }
+message CommitRequest { string group = 1; string topic = 2; int32 partition = 3; int64 next_offset = 4; string member = 5; int64 generation = 6; }
+message MemberRequest { string group = 1; string topic = 2; string member = 3; }
+message Assignment { int64 generation = 1; repeated Partition partitions = 2; repeated string active_members = 3; }
+message FailRequest { string topic = 1; int32 partition = 2; int64 offset = 3; string error = 4; }
+message RetryResponse { string target_topic = 1; int32 attempt = 2; int64 due_unix_nano = 3; string job_id = 4; }

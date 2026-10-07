@@ -1,0 +1,29 @@
+name: verify
+on: [push, pull_request]
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.6-bookworm
+        env:
+          POSTGRES_USER: streamforge
+          POSTGRES_DB: streamforge
+          POSTGRES_PASSWORD: ci-test-password
+        ports: [5432:5432]
+        options: --health-cmd="pg_isready -U streamforge" --health-interval=3s --health-timeout=3s --health-retries=20
+      redis:
+        image: redis:8.2.1-bookworm
+        ports: [6379:6379]
+        options: --health-cmd="redis-cli ping" --health-interval=3s --health-timeout=3s --health-retries=20
+    env:
+      STREAMFORGE_INTEGRATION: "1"
+      POSTGRES_DSN: postgres://streamforge:ci-test-password@localhost:5432/streamforge?sslmode=disable
+      REDIS_ADDR: localhost:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: {go-version: '1.27.1'}
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test -race -count=1 ./...
