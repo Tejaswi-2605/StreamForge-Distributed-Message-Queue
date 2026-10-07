@@ -4,7 +4,7 @@ Completion work executed on **5â€“6 October 2026**, Asia/Calcutta. **The ed
 
 ## Final source verification
 
-All seven Windows binaries rebuilt successfully. `go vet ./...`, `go mod verify`, and Linux/amd64 cross-compilation (`CGO_ENABLED=0 go build -buildvcs=false ./...`) passed. The cross-build verifies compilation, not Linux or container execution.
+All seven Windows binaries rebuilt successfully. `go vet ./...`, `go mod verify`, and Linux/amd64 cross-compilation (` CGO_ENABLED=0 go build -buildvcs=false ./...`) passed. The cross-build verifies compilation, not Linux or container execution.
 
 | Check | Passing leaf cases | Failures / skips | Integration cases | Integration seconds |
 |---|---:|---:|---:|---:|
