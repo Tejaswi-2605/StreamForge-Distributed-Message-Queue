@@ -59,25 +59,6 @@ Retry scheduling is durable in PostgreSQL. The worker publishes into `<topic>.re
 
 These changes do not migrate legacy unsafe topic names or retroactively authenticate old producer-controlled headers. Back up and inspect existing data before upgrading; startup fails closed on rejected legacy topic names. Additional limitations and the original reproductions are recorded in [FILE_REVIEW.md](docs/FILE_REVIEW.md).
 
-## Repository layout
-
-| Path | Purpose |
-|---|---|
-| `cmd/` | Executable entry points |
-| `internal/logstore/` | Framed logs, recovery, rotation, indexes and segment trimming |
-| `internal/broker/`, `internal/server/` | API behavior, workers, request bounds and server lifecycle |
-| `internal/metadata/` | PostgreSQL metadata and Redis coordination |
-| `internal/client/`, `internal/cli/` | Owner routing and CLI connections/output |
-| `internal/config/`, `internal/domain/`, `internal/retry/` | Configuration, validation and backoff |
-| `internal/metrics/`, `internal/replay/` | Telemetry and event-envelope ingestion |
-| `api/proto/`, `api/gen/` | API schema and included generated Go code |
-| `migrations/` | Embedded initial PostgreSQL schema |
-| `tests/integration/` | Real-database cluster and stress tests |
-| `scripts/`, `Makefile` | Build, generation, verification and demonstration commands |
-| `docker/`, `docker-compose.yml` | Image, seven Compose services and Prometheus config |
-| `docs/` | Completion and file-boundary audits |
-| `data/` | Dataset documentation; ignored raw/local/broker runtime directories |
-| `.tools/`, `bin/`, `artifacts/` | Ignored local tools, binaries and verification evidence |
 
 The Go package graph contains 21 project packages, all inside this root. It contains no sibling-project source or nested project root. Diagnostic Go helpers live under underscore-prefixed artifact directories to exclude them from `go test ./...`. Third-party dependency/tool files are required external components; they were not individually reviewed line by line. This folder currently has no independent `.git` repository.
 
@@ -200,15 +181,5 @@ Log append is O(record bytes), with occasional rotation/fsync. Startup scans all
 RETENTION_MAX_SEGMENTS defaults to 0 (disabled). Set a positive count and RETENTION_INTERVAL (default 1m) for automatic inactive-segment trimming. Pending durable retries pin source segments, making the count a soft limit until dispatch completes. Consumer lag does not pin records: expired reads explicitly return OutOfRange. There is no topic deletion workflow. All retained segment handles stay open. Recovery fails closed on corruption; clean shutdown drains RPCs with a timeout, stops workers and closes logs/databases, but an acknowledgment can be ambiguous if cancellation races with an already-started write.
 
 The original educational deliverable is complete: source, native and Docker services, actual Prometheus scraping, recovery, retention, CLI behavior, authentic replay, workload coverage and documentation are verified. scripts/verify-docker.ps1 reproduces the container checks and removes its own temporary test stack; the normal user stack is started separately with the commands above. The four audited bugs have fixes/regressions, and failed retry jobs no longer block other selected jobs in the same worker pass. [Detailed design contracts](docs/DESIGN.md) explain the remaining bounded-selection fairness limit. Production evolution would additionally need namespace isolation, replication/quorum acknowledgment, leader election and fencing, controlled reassignment, security and operational recovery procedures. These are future work, not current guarantees.
-
-## Documentation
-
-- [RESULTS.md](RESULTS.md): verified tests, benchmarks, replay and evidence limitations.
-- [verification-results.json](docs/verification-results.json) and [benchmark-results.json](docs/benchmark-results.json): compact machine-readable verification and measurements.
-- [COMPLETION_AUDIT.md](docs/COMPLETION_AUDIT.md): original audit with a follow-up noting newly supplied documentation.
-- [FILE_REVIEW.md](docs/FILE_REVIEW.md): original file inventory, folder scope and defect-fix follow-up.
-- [DESIGN.md](docs/DESIGN.md): implemented design, locking/lifecycle/durability/size contracts, complexity and future architecture.
-- [data/README.md](data/README.md) and [data/PROVENANCE.json](data/PROVENANCE.json): authentic dataset details.
-- `LEARNING_GUIDE.md`: private local 65-part study/interview guide in this root. It is intentionally listed in `.gitignore` and `.dockerignore`; it is not part of a future public checkout.
 
 No project license has been selected. Public availability of an archive is not a blanket license for every event's content. Keep raw data, local tools, credentials and audit artifacts out of a public repository.
