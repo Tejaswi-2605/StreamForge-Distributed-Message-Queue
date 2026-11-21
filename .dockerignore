@@ -9,3 +9,4 @@ data/brokers
 .env.*
 !.env.example
 LEARNING_GUIDE.md
+README_PRIVATE.md

@@ -2,7 +2,17 @@
 
 A Go event-streaming broker built to study durable logs, partition routing, consumer coordination and failure handling. This is an **educational portfolio project, not production-ready infrastructure**.
 
-**Current status: complete and verified for the educational portfolio scope.** All seven commands build, static analysis passes, and 50 leaf cases (17 real-database integration tests) pass normally and under race detection. Automatic retention, abrupt process recovery, executable CLI checks, the eight-workload benchmark matrix and payload-verified consumer-group replay are now supplied. Docker image build, six-service Compose health, the container demo and actual Prometheus scraping of all three brokers also passed. See [RESULTS.md](RESULTS.md), [design contracts](docs/DESIGN.md), [completion audit](docs/COMPLETION_AUDIT.md) and [file review](docs/FILE_REVIEW.md).
+## Monitoring and verification
+
+Broker request/error counters include overload and canceled requests rejected
+before handler execution. Structured failure logs cover those paths, and
+regressions verify counter accuracy and admission-slot release.
+
+**52 test cases, including 17 real-service integration cases, passed in both
+normal and race-detector runs.** The CI workflow runs those checks with
+PostgreSQL/Redis, verifies modules, performs static analysis and builds all
+packages. Hosted workflow execution is not claimed. See [RESULTS.md](RESULTS.md).
+This is a custom Go message queue; no Apache Kafka connector is implemented.
 
 ## What is implemented
 
@@ -57,29 +67,9 @@ Retry scheduling is durable in PostgreSQL. The worker publishes into `<topic>.re
 | Forged `sf.*` provenance | External direct/batch publication rejects reserved headers, including case variants. Only the private worker path can supply internal provenance. |
 | Payload/transport/fetch mismatch | Shared budgets support configured payloads up to 16 MiB, including record/request/response headroom. Network tests read back 5 MiB/16 MiB records, check maximum batch payload, over-limit rejection and restart. Oversized first records return an error rather than an empty success. |
 
-These changes do not migrate legacy unsafe topic names or retroactively authenticate old producer-controlled headers. Back up and inspect existing data before upgrading; startup fails closed on rejected legacy topic names. Additional limitations and the original reproductions are recorded in [FILE_REVIEW.md](docs/FILE_REVIEW.md).
+These changes do not migrate legacy unsafe topic names or retroactively authenticate old producer-controlled headers. Back up and inspect existing data before upgrading; startup fails closed on rejected legacy topic names. Additional limitations and the original reproductions are recorded in FILE_REVIEW.md.
 
-## Repository layout
 
-| Path | Purpose |
-|---|---|
-| `cmd/` | Executable entry points |
-| `internal/logstore/` | Framed logs, recovery, rotation, indexes and segment trimming |
-| `internal/broker/`, `internal/server/` | API behavior, workers, request bounds and server lifecycle |
-| `internal/metadata/` | PostgreSQL metadata and Redis coordination |
-| `internal/client/`, `internal/cli/` | Owner routing and CLI connections/output |
-| `internal/config/`, `internal/domain/`, `internal/retry/` | Configuration, validation and backoff |
-| `internal/metrics/`, `internal/replay/` | Telemetry and event-envelope ingestion |
-| `api/proto/`, `api/gen/` | API schema and included generated Go code |
-| `migrations/` | Embedded initial PostgreSQL schema |
-| `tests/integration/` | Real-database cluster and stress tests |
-| `scripts/`, `Makefile` | Build, generation, verification and demonstration commands |
-| `docker/`, `docker-compose.yml` | Image, seven Compose services and Prometheus config |
-| `docs/` | Completion and file-boundary audits |
-| `data/` | Dataset documentation; ignored raw/local/broker runtime directories |
-| `.tools/`, `bin/`, `artifacts/` | Ignored local tools, binaries and verification evidence |
-
-The Go package graph contains 21 project packages, all inside this root. It contains no sibling-project source or nested project root. Diagnostic Go helpers live under underscore-prefixed artifact directories to exclude them from `go test ./...`. Third-party dependency/tool files are required external components; they were not individually reviewed line by line. This folder currently has no independent `.git` repository.
 
 ## Build on Windows
 
@@ -172,7 +162,7 @@ To reproduce the eight-workload matrix with automatic isolated local brokers, fi
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/benchmark.ps1 -ReplayArchive data/raw/2015-01-01-15.json.gz
 ```
 
-It covers 10k/100k/500k messages, 100/1024/10240-byte payloads, 1/3/10 partitions and one/three API brokers. Large cases use write mode; smaller cases measure fsync separately. It saves a unique report directory, stops only its own broker processes and drops only its isolated SQL schemas. Log data remains ignored for inspection. This is a coverage matrix, not the full Cartesian product. [Machine-readable observations](docs/benchmark-results.json) accompany RESULTS. Windows timing uses QueryPerformanceCounter; other platforms use Go's monotonic clock.
+It covers 10k/100k/500k messages, 100/1024/10240-byte payloads, 1/3/10 partitions and one/three API brokers. Large cases use write mode; smaller cases measure fsync separately. It saves a unique report directory, stops only its own broker processes and drops only its isolated SQL schemas. Log data remains ignored for inspection. This is a coverage matrix, not the full Cartesian product. Machine-readable observations accompany RESULTS. Windows timing uses QueryPerformanceCounter; other platforms use Go's monotonic clock.
 
 With local brokers running, individual examples are:
 
@@ -199,16 +189,5 @@ Log append is O(record bytes), with occasional rotation/fsync. Startup scans all
 
 RETENTION_MAX_SEGMENTS defaults to 0 (disabled). Set a positive count and RETENTION_INTERVAL (default 1m) for automatic inactive-segment trimming. Pending durable retries pin source segments, making the count a soft limit until dispatch completes. Consumer lag does not pin records: expired reads explicitly return OutOfRange. There is no topic deletion workflow. All retained segment handles stay open. Recovery fails closed on corruption; clean shutdown drains RPCs with a timeout, stops workers and closes logs/databases, but an acknowledgment can be ambiguous if cancellation races with an already-started write.
 
-The original educational deliverable is complete: source, native and Docker services, actual Prometheus scraping, recovery, retention, CLI behavior, authentic replay, workload coverage and documentation are verified. scripts/verify-docker.ps1 reproduces the container checks and removes its own temporary test stack; the normal user stack is started separately with the commands above. The four audited bugs have fixes/regressions, and failed retry jobs no longer block other selected jobs in the same worker pass. [Detailed design contracts](docs/DESIGN.md) explain the remaining bounded-selection fairness limit. Production evolution would additionally need namespace isolation, replication/quorum acknowledgment, leader election and fencing, controlled reassignment, security and operational recovery procedures. These are future work, not current guarantees.
-
-## Documentation
-
-- [RESULTS.md](RESULTS.md): verified tests, benchmarks, replay and evidence limitations.
-- [verification-results.json](docs/verification-results.json) and [benchmark-results.json](docs/benchmark-results.json): compact machine-readable verification and measurements.
-- [COMPLETION_AUDIT.md](docs/COMPLETION_AUDIT.md): original audit with a follow-up noting newly supplied documentation.
-- [FILE_REVIEW.md](docs/FILE_REVIEW.md): original file inventory, folder scope and defect-fix follow-up.
-- [DESIGN.md](docs/DESIGN.md): implemented design, locking/lifecycle/durability/size contracts, complexity and future architecture.
-- [data/README.md](data/README.md) and [data/PROVENANCE.json](data/PROVENANCE.json): authentic dataset details.
-- `LEARNING_GUIDE.md`: private local 65-part study/interview guide in this root. It is intentionally listed in `.gitignore` and `.dockerignore`; it is not part of a future public checkout.
 
 No project license has been selected. Public availability of an archive is not a blanket license for every event's content. Keep raw data, local tools, credentials and audit artifacts out of a public repository.

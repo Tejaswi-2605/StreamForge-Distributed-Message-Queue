@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-22",
+  "normal": {
+    "leaf_cases": {
+      "pass": 52
+    },
+    "top_level_cases": 47,
+    "integration_cases": 17,
+    "integration_seconds": 81.368
+  },
+  "race": {
+    "leaf_cases": {
+      "pass": 52
+    },
+    "top_level_cases": 47,
+    "integration_cases": 17,
+    "integration_seconds": 95.488
+  },
+  "vet": "passed",
+  "build": "passed",
+  "module_integrity": "passed",
+  "workflow_actionlint": "passed",
+  "hosted_ci": "not run",
+  "kafka_connector": "not implemented"
+}

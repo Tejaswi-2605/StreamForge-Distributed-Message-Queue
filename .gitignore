@@ -16,3 +16,6 @@ data/local/
 .DS_Store
 LEARNING_GUIDE.md
 docs/
+
+# Private implementation notes
+README_PRIVATE.md

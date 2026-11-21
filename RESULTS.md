@@ -1,6 +1,43 @@
 # StreamForge verified results
 
-Completion work executed on **5â€“6 October 2026**, Asia/Calcutta. **The educational portfolio deliverable is complete and verified: native and Docker builds/services, tests/race checks, recovery, retention, CLI behavior, workload coverage, authentic replay and actual Prometheus scraping passed.** Historical initial measurements below remain explicitly separate.
+## Verification â€” 22 November 2026
+
+The unary interceptor now observes the final return value in a defer registered
+before admission. Overload and cancellation therefore count as requests/errors
+and receive structured failure logs. Admitted handlers still release their slots;
+new tests verify rejected calls never invoke the handler and errors count once.
+
+| Check | Normal | Race detector |
+| --- | ---: | ---: |
+| Unique passing leaf cases | 52 | 52 |
+| Failures / skipped cases | 0 / 0 | 0 / 0 |
+| Real-service integration cases | 17 | 17 |
+| Integration package seconds | 81.368 | 95.488 |
+
+There are 47 top-level test names. The corruption subtests account for the leaf
+count; running normal and race checks does not create 104 different test cases.
+Real native PostgreSQL/Redis backed partition routing, group offsets/resume,
+replay/recovery, retention, retry/DLQ and forced broker-process recovery tests.
+`go vet ./...`, `go mod verify` and `go build ./...` passed. The new GitHub Actions
+workflow passed local actionlint validation. Hosted execution was not part of these local results.
+
+Evidence: [portable verification](verification-2026-11-22.json), with full ignored
+logs in `artifacts/portfolio-2026-11-22/`. Reproduce normal/race verification with
+`scripts/verify.ps1 -Integration` after `scripts/local-services.ps1 start`.
+Windows race compilation required the existing GCC archive in a path without
+spaces, as already documented by the project; this was a toolchain path issue.
+
+Completed: monitoring correction, two new regressions, normal/race service tests,
+static analysis, module integrity, builds and CI configuration. No optional Kafka
+connector was added. The full GH Archive replay and Docker/Prometheus deployment
+were not rerun in this session; their October evidence below stays historical.
+The custom broker still has no replicated partition failover, quorum durability,
+or exactly-once publication guarantee. Benchmark numbers below were not improved
+or remeasured by the monitoring change.
+
+---
+
+Completion work executed on **5Ã¢â‚¬â€œ6 October 2026**, Asia/Calcutta. **The educational portfolio deliverable is complete and verified: native and Docker builds/services, tests/race checks, recovery, retention, CLI behavior, workload coverage, authentic replay and actual Prometheus scraping passed.** Historical initial measurements below remain explicitly separate.
 
 ## Final source verification
 
