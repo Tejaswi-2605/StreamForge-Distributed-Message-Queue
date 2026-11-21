@@ -1,0 +1,35 @@
+name: StreamForge verification
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17.11-alpine
+        env: {POSTGRES_USER: streamforge, POSTGRES_PASSWORD: local-ci-only, POSTGRES_DB: streamforge}
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd 'pg_isready -U streamforge -d streamforge'
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7.4.11-alpine
+        ports: ['6379:6379']
+        options: --health-cmd 'redis-cli ping' --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      STREAMFORGE_INTEGRATION: '1'
+      POSTGRES_DSN: postgres://streamforge:local-ci-only@127.0.0.1:5432/streamforge?sslmode=disable
+      REDIS_ADDR: 127.0.0.1:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: {go-version-file: go.mod, cache: true}
+      - run: go mod verify
+      - run: go vet ./...
+      - run: go test -race -count=1 ./...
+      - run: go build ./...
