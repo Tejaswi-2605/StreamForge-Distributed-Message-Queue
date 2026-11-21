@@ -2,17 +2,14 @@
 
 A Go event-streaming broker built to study durable logs, partition routing, consumer coordination and failure handling. This is an **educational portfolio project, not production-ready infrastructure**.
 
-## Monitoring and verification
+## Monitoring
 
-Broker request/error counters include overload and canceled requests rejected
-before handler execution. Structured failure logs cover those paths, and
-regressions verify counter accuracy and admission-slot release.
+Broker request/error counters include overloaded and canceled requests rejected
+before handler execution. Structured logs record these failures alongside
+handler errors. Prometheus exposes broker counters and request-duration metrics.
 
-**52 test cases, including 17 real-service integration cases, passed in both
-normal and race-detector runs.** The CI workflow runs those checks with
-PostgreSQL/Redis, verifies modules, performs static analysis and builds all
-packages. Hosted workflow execution is not claimed. See [RESULTS.md](RESULTS.md).
-This is a custom Go message queue; no Apache Kafka connector is implemented.
+This is a custom Go message queue. Measurement details and operational limits
+are recorded in [RESULTS.md](RESULTS.md).
 
 ## What is implemented
 
@@ -24,7 +21,6 @@ This is a custom Go message queue; no Apache Kafka connector is implemented.
 - Delayed retries, capped exponential backoff and dead-letter topics carrying original-message provenance.
 - Bounded requests, batches and fetches; JSON broker logging; dependency health and Prometheus text metrics.
 - Seven executables: broker, admin, producer, consumer, demo, benchmark and replay.
-- Tests using real databases, a deterministic mixed-operation stress test, forced standalone-process termination and actual producer/consumer executables; replay of an authentic GH Archive hour.
 
 No replication, consensus, automatic failover, authentication, TLS or exactly-once processing guarantee is implemented. The consumer CLI performs one read pass; it is not a continuously polling consumer service.
 
@@ -54,26 +50,13 @@ Ordering exists **within a partition**. Keyed publication uses FNV-1a hashing mo
 
 A commit stores the **next offset to read**. After processing offset 7, commit 8. PostgreSQL makes commits monotonic; joining a new group starts independently. Generation and assignment checks fence stale group members. Applications must complete processing before committing and make side effects idempotent: a crash after a side effect but before its commit can cause redelivery.
 
-`FSYNC_MODE=fsync` synchronizes the record file before acknowledgment. `write` acknowledges after a file write into the operating system's cache. Recovery scans records, checks framing/checksums and rebuilds indexes; corrupt or truncated records cause a startup error. Clean restart and abrupt standalone-process termination recovery are tested. Directory synchronization, automatic damaged-tail repair and power-loss durability are not established. Batch publication can leave a successful prefix if a later record fails.
+`FSYNC_MODE=fsync` synchronizes the record file before acknowledgment. `write` acknowledges after a file write into the operating system's cache. Recovery scans records, checks framing/checksums and rebuilds indexes; corrupt or truncated records cause a startup error. Restart recovery uses persisted logs and metadata. Directory synchronization, automatic damaged-tail repair and power-loss durability are not established. Batch publication can leave a successful prefix if a later record fails.
 
 Retry scheduling is durable in PostgreSQL. The worker publishes into `<topic>.retry` or `<topic>.dlq`, then marks the job complete. A crash between those steps can duplicate delivery. Processing a retry and failing it again requires a consumer action; the broker does not execute application handlers.
 
-## Correctness fixes
-
-| Audited problem | Current fix and regression |
-|---|---|
-| Windows case/path aliases | Topics require lowercase names and reject trailing dots/device basenames. API regressions check rejection and safe-topic restart/readback. Group/member names retain their existing case-sensitive contract. |
-| Retry exhausts the 32-header allowance | The private retry path separately allows seven trusted internal headers. A real-database test preserves all 32 user headers through two retries and DLQ. |
-| Forged `sf.*` provenance | External direct/batch publication rejects reserved headers, including case variants. Only the private worker path can supply internal provenance. |
-| Payload/transport/fetch mismatch | Shared budgets support configured payloads up to 16 MiB, including record/request/response headroom. Network tests read back 5 MiB/16 MiB records, check maximum batch payload, over-limit rejection and restart. Oversized first records return an error rather than an empty success. |
-
-These changes do not migrate legacy unsafe topic names or retroactively authenticate old producer-controlled headers. Back up and inspect existing data before upgrading; startup fails closed on rejected legacy topic names. Additional limitations and the original reproductions are recorded in FILE_REVIEW.md.
-
-
-
 ## Build on Windows
 
-Run from this directory. The existing local setup has Go, PostgreSQL, Redis and generated protobuf code. The tool/cache directories are ignored and will not accompany a future clone. A fresh machine needs compatible Go and database installations; build/test scripts do not install those dependencies. Optional Windows Docker/WSL setup is supplied separately. The module requires Go 1.25 or later; the audited build used Go 1.27.1.
+Run from this directory. The existing local setup has Go, PostgreSQL, Redis and generated protobuf code. The tool/cache directories are ignored and will not accompany a future clone. A fresh machine needs compatible Go and database installations; build scripts do not install those dependencies. Optional Windows Docker/WSL setup is supplied separately. The module requires Go 1.25 or later; the audited build used Go 1.27.1.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1
@@ -121,7 +104,6 @@ Use Ctrl+C to stop foreground brokers. Local database shutdown is available thro
 
 ### Docker Compose
 
-**Container build and execution verified on 6 October 2026.** WSL 2.7.13 and Docker Desktop 4.94.0 were installed during completion work; Docker Engine 29.8.2 and Compose 5.5.1 started the supplied Linux stack successfully. Optional setup: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/setup-docker.ps1`. It may request Windows administrator approval and never automatically restarts the computer. Use [RESULTS.md](RESULTS.md) for the latest observed setup state.
 
 Copy `.env.example` to `.env` and set a local `POSTGRES_PASSWORD` containing URI-safe characters, such as a generated hexadecimal password. Compose interpolates it directly into the database URL.
 
@@ -134,45 +116,10 @@ docker compose --profile tools run --rm --entrypoint admin tools create-topic --
 docker compose ps
 ```
 
-For an isolated build/demo/health/Prometheus check, run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/verify-docker.ps1` after the Docker engine is running. It chooses separate host ports and its own Compose project, removes only that test project and volumes, and saves evidence under `artifacts/docker/`. Default Compose host ports are configurable through POSTGRES_PORT, REDIS_PORT, BROKER_1_PORT..BROKER_3_PORT, METRICS_1_PORT..METRICS_3_PORT and PROMETHEUS_PORT.
 
-The tools container uses advertised internal addresses `broker-1:9001` through `broker-3:9001`. Host CLIs cannot resolve these Docker service names; run cluster clients in the tools container for this configuration. Prometheus is configured at `http://127.0.0.1:9090`; the isolated verification confirmed three healthy targets and successful scrapes. `docker compose down` stops the stack; named volumes persist. Avoid deleting volumes if you need their data.
+The tools container uses advertised internal addresses `broker-1:9001` through `broker-3:9001`. Host CLIs cannot resolve these Docker service names; run cluster clients in the tools container for this configuration. Prometheus is configured at `http://127.0.0.1:9090`. `docker compose down` stops the stack; named volumes persist. Avoid deleting volumes if you need their data.
 
-## Tests and measurements
-
-The integration gate is `STREAMFORGE_INTEGRATION=1`. Without it, integration tests can skip. Set database endpoints for the local services explicitly:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass
-. .\scripts\env.ps1
-$env:GOFLAGS = '-buildvcs=false'
-$env:POSTGRES_DSN = 'postgres://streamforge@127.0.0.1:55432/streamforge?sslmode=disable'
-$env:REDIS_ADDR = '127.0.0.1:56379'
-$env:STREAMFORGE_INTEGRATION = '1'
-go test -count=1 ./...
-go vet ./...
-go mod verify
-```
-
-Race verification requires `CGO_ENABLED=1` and a working C compiler. On this Windows machine GCC's manifest path failed inside a directory containing spaces; a temporary compiler extraction into a path without spaces enabled the audit run. `scripts/verify.ps1 -Integration` fails if race testing fails or is unavailable. It can extract the existing optional `.tools/gcc.zip` into a task-owned temporary path without spaces and remove it afterward; fresh clones need a working compiler. It saves normal/race JSON logs and verifies dependency integrity. See [RESULTS.md](RESULTS.md) for successful execution evidence.
-
-To reproduce the eight-workload matrix with automatic isolated local brokers, first build the binaries and start PostgreSQL/Redis, then run:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/benchmark.ps1 -ReplayArchive data/raw/2015-01-01-15.json.gz
-```
-
-It covers 10k/100k/500k messages, 100/1024/10240-byte payloads, 1/3/10 partitions and one/three API brokers. Large cases use write mode; smaller cases measure fsync separately. It saves a unique report directory, stops only its own broker processes and drops only its isolated SQL schemas. Log data remains ignored for inspection. This is a coverage matrix, not the full Cartesian product. Machine-readable observations accompany RESULTS. Windows timing uses QueryPerformanceCounter; other platforms use Go's monotonic clock.
-
-With local brokers running, individual examples are:
-
-```powershell
-.\bin\streamforge-benchmark.exe --mode raw --messages 10000 --size 1024 --partitions 1 --durability fsync
-.\bin\streamforge-benchmark.exe --mode api --messages 10000 --size 100 --partitions 3 --durability fsync
-go test -run '^$' -bench BenchmarkAppend -benchtime=500x -benchmem ./internal/logstore
-```
-
-The API benchmark's durability flag labels the run; it does not reconfigure the broker. Configure `FSYNC_MODE` on the brokers first. A raw run measures local log operations; an API run includes routing, gRPC and metadata overhead. Do not compare the recorded runs as equivalent workloads: their payload sizes differ.
+## Replay
 
 Replay requires the downloaded archive and an empty topic:
 
