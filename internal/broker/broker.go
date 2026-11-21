@@ -95,8 +95,15 @@ func (b *Broker) Close() error {
 	}
 	return errors.Join(errs...)
 }
-func (b *Broker) Interceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+func (b *Broker) Interceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (response interface{}, err error) {
 	start := time.Now()
+	// Admission failures are requests too: measure every return path.
+	defer func() {
+		b.Metrics.Observe(time.Since(start), err)
+		if err != nil {
+			slog.Warn("RPC failed", "broker_id", b.C.ID, "operation", info.FullMethod, "code", status.Code(err).String())
+		}
+	}()
 	select {
 	case b.slots <- struct{}{}:
 		defer func() { <-b.slots }()
@@ -109,10 +116,6 @@ func (b *Broker) Interceptor(ctx context.Context, req interface{}, info *grpc.Un
 		return nil, status.FromContextError(e).Err()
 	}
 	v, e := handler(ctx, req)
-	b.Metrics.Observe(time.Since(start), e)
-	if e != nil {
-		slog.Warn("RPC failed", "broker_id", b.C.ID, "operation", info.FullMethod, "code", status.Code(e).String())
-	}
 	return v, e
 }
 func rpcError(e error) error {
